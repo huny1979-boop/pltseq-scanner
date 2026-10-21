@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>파렛트 순번 투입 프로그램</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- HTML5 QRCode Scanner Library (Android / iOS WebRTC Camera Support) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- QRCode.js for Test Label Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Google Fonts: Inter & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    body {
+      font-family: 'Noto Sans KR', 'Inter', sans-serif;
+      background-color: #0b1120;
+      color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      min-height: 100dvh;
+    }
+    /* Custom styling for html5-qrcode video container */
+    #qr-reader {
+      width: 100% !important;
+      border: none !important;
+      background: #000;
+      overflow: hidden;
+      border-radius: 1rem;
+      position: relative;
+    }
+    #qr-reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      border-radius: 1rem;
+    }
+    #qr-reader__dashboard,
+    #qr-reader__header_message {
+      display: none !important;
+    }
+    /* Laser scan animation inside scanner viewfinder */
+    @keyframes scanLaser {
+      0% { top: 8%; opacity: 0.4; }
+      50% { top: 88%; opacity: 1; }
+      100% { top: 8%; opacity: 0.4; }
+    }
+    .laser-line {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #22d3ee, #38bdf8, #22d3ee, transparent);
+      box-shadow: 0 0 12px #22d3ee, 0 0 24px #0284c7;
+      animation: scanLaser 2.2s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 15;
+    }
+    @keyframes pulseRing {
+      0% { transform: scale(0.97); opacity: 0.85; }
+      50% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0.97); opacity: 0.85; }
+    }
+    .scan-frame-pulse {
+      animation: pulseRing 2s infinite ease-in-out;
+    }
+    /* Custom scrollbar for history & sequence list */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-[100dvh] bg-slate-950 text-slate-100">
+
+  <!-- ================= TOP HEADER BAR ================= -->
+  <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-3 py-2.5 shadow-lg">
+    <div class="max-w-md mx-auto flex items-center justify-between gap-2">
+      <!-- Left: App Title & Breadcrumb -->
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+          <svg class="w-5 h-5 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 14.625v4.5m4.5-4.5v4.5m-2.25-4.5v4.5" />
+          </svg>
+        </div>
+        <div class="truncate">
+          <h1 class="text-base font-extrabold tracking-tight text-white leading-tight truncate">파렛트 순번 투입 시스템</h1>
+          <p id="header-Subtitle" class="text-xs font-medium text-cyan-400 truncate">홈 화면 · 라인을 선택하세요</p>
+        </div>
+      </div>
+
+      <!-- Right: Sound Toggle & QR Label Helper -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="btn-sound-toggle" onclick="toggleSound()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95" title="알림음 켜기/끄기">
+          <svg id="icon-sound-on" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+          </svg>
+          <svg id="icon-sound-off" class="w-4 h-4 text-rose-400 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.531V19.94a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.506-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.395C2.806 8.757 3.63 8.25 4.51 8.25H6.75z" />
+          </svg>
+        </button>
+
+        <button onclick="openQrGeneratorModal()" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-cyan-300 flex items-center gap-1 transition active:scale-95">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+          </svg>
+          <span>식별표QR</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT CONTAINER ================= -->
+  <main class="flex-1 w-full max-w-md mx-auto px-3 pt-3 pb-24 flex flex-col">
+
+    <!-- 1. HOME SCREEN: LINE SELECTION (11라인, 12라인, 22라인, 23라인) -->
+    <section id="screen-home" class="flex-1 flex flex-col gap-3.5">
+      <!-- Top Info Banner -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800/90 to-slate-900 border border-slate-700/80 rounded-2xl p-3.5 shadow-md">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping"></span>
+              STEP 1 · 투입 라인 선택
+            </span>
+            <h2 class="text-lg font-extrabold text-white mt-1.5">작업할 라인을 선택해주세요</h2>
+            <p class="text-xs text-slate-400 mt-0.5">각 라인별·품목별 스캔 이력은 자동 저장됩니다.</p>
+          </div>
+          <div class="text-right">
+            <div class="text-[11px] text-slate-400 font-medium">총 누적 스캔</div>
+            <div id="home-total-scanned" class="text-xl font-black text-cyan-400">0건</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 Line Buttons Grid -->
+      <div id="line-buttons-container" class="grid grid-cols-1 gap-3 flex-1">
+        <!-- Rendered dynamically by JS -->
+      </div>
+
+      <!-- Item QR Code Spec Reference Accordion -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3">
+        <button onclick="toggleSpecTable()" class="w-full flex items-center justify-between text-xs font-bold text-slate-300">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+            </svg>
+            품목별 파렛트 식별표 QR 규격 안내 (라인+품목+순번)
+          </span>
+          <span id="spec-toggle-label" class="text-cyan-400">펼치기 ▼</span>
+        </button>
+        <div id="spec-table-wrapper" class="hidden mt-2.5 pt-2.5 border-t border-slate-800 text-[11px] text-slate-300 space-y-1.5">
+          <p class="text-slate-400">예시 (11라인 F/C 1번): <code class="text-cyan-300 bg-slate-950 px-1.5 py-0.5 rounded font-mono">11|E10E10100|E20E20110|E30E30100|1</code></p>
+          <div class="grid grid-cols-1 gap-1 font-mono text-[10px]">
+            <div class="flex justify-between bg-slate-950/70 px-2 py-1 rounded"><span class="font-bold text-amber-300">F/C</span><span>|E10E10100|E20E20110|E30E30100|</span></div>
+            <div class="flex justify-between bg-slate-950/70 px-2 py-1 rounded"><span class="font-bold text-amber-300">F/B</span><span>|E10E10100|E20E20100|E30E30100|</span></div>
+            <div class="flex justify-between bg-slate-950/70 px-2 py-1 rounded"><span class="font-bold text-emerald-300">R/C</span><span>|E10E10100|E20E20110|E30E30110|</span></div>
+            <div class="flex justify-between bg-slate-950/70 px-2 py-1 rounded"><span class="font-bold text-emerald-300">R/B</span><span>|E10E10100|E20E20100|E30E30110|</span></div>
+            <div class="flex justify-between bg-slate-950/70 px-2 py-1 rounded"><span class="font-bold text-purple-300">3/C</span><span>|E10E10100|E20E20110|E30E30130|</span></div>
+            <div class="flex justify-between bg-slate-950/70 px-2 py-1 rounded"><span class="font-bold text-purple-300">3/B</span><span>|E10E10100|E20E20100|E30E30130|</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ITEM SELECTION SCREEN: (F/C, F/B, R/C, R/B, 3/C, 3/B) -->
+    <section id="screen-items" class="hidden flex-1 flex flex-col gap-3.5">
+      <!-- Top Context Banner -->
+      <div class="bg-gradient-to-r from-blue-950/90 via-slate-900 to-slate-900 border border-blue-500/40 rounded-2xl p-3.5 shadow-md">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+              STEP 2 · 품목 선택 (자동 스캐너 실행)
+            </span>
+            <h2 class="text-xl font-black text-white mt-1 flex items-center gap-2">
+              <span id="selected-line-badge" class="px-2.5 py-0.5 rounded-lg bg-blue-600 text-white text-base">11라인</span>
+              <span>투입 품목 선택</span>
+            </h2>
+          </div>
+          <button onclick="navigateToHome()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 flex items-center gap-1 active:scale-95 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            라인 변경
+          </button>
+        </div>
+        <p class="text-xs text-slate-300 mt-2">
+          품목을 누르면 <strong class="text-cyan-300">이전 스캔 다음 순번부터</strong> 카메라 스캐너가 자동으로 켜집니다.
+        </p>
+      </div>
+
+      <!-- 6 Item Buttons Grid (2 columns x 3 rows for large touch targets) -->
+      <div id="item-buttons-container" class="grid grid-cols-2 gap-3 flex-1">
+        <!-- Rendered dynamically by JS -->
+      </div>
+    </section>
+
+    <!-- 3. QR SCANNER SCREEN -->
+    <section id="screen-scanner" class="hidden flex-1 flex flex-col gap-2.5">
+      <!-- Top Status Header inside Scanner -->
+      <div class="bg-slate-900 border border-slate-700/90 rounded-2xl p-3 shadow-lg">
+        <div class="flex items-center justify-between gap-2">
+          <!-- Line & Item Badges + Change Item button -->
+          <div class="flex items-center gap-2">
+            <span id="scan-line-badge" class="px-2.5 py-1 rounded-xl bg-blue-600 text-white font-black text-sm shadow">11라인</span>
+            <span id="scan-item-badge" class="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black text-base shadow">F/C</span>
+            <button onclick="navigateToItems(state.currentLine)" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-300 active:scale-95 transition">
+              품목변경
+            </button>
+          </div>
+
+          <!-- Current Sequence Target Box -->
+          <div class="text-right">
+            <div class="text-[11px] font-semibold text-slate-400">투입 대기 순번</div>
+            <div id="scan-expected-seq-display" class="text-2xl font-black text-cyan-400 leading-none mt-0.5">
+              1<span class="text-xs font-bold text-slate-400 ml-0.5">/ 20번</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expected QR String Preview Bar -->
+        <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between gap-2 text-xs">
+          <span class="text-slate-400 font-medium shrink-0">목표 QR:</span>
+          <code id="scan-expected-qr-code" class="font-mono text-[11px] text-cyan-300 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 truncate flex-1 text-right">
+            11|E10E10100|E20E20110|E30E30100|1
+          </code>
+        </div>
+      </div>
+
+      <!-- Camera Viewport Box -->
+      <div class="relative bg-black rounded-2xl border-2 border-slate-700 overflow-hidden shadow-xl aspect-[4/3] max-h-[290px] w-full mx-auto flex items-center justify-center">
+        <!-- HTML5-QRCode target div -->
+        <div id="qr-reader" class="w-full h-full"></div>
+
+        <!-- Viewfinder Overlay Guide -->
+        <div id="scanner-overlay-guide" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-between p-3 z-10">
+          <div class="w-full flex items-center justify-between">
+            <span id="camera-status-pill" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-950/80 text-emerald-400 border border-emerald-500/40 backdrop-blur-sm">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              스캐너 가동중 · 자동 연속 스캔
+            </span>
+            <button onclick="switchCameraFacing()" class="pointer-events-auto px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-950/80 text-slate-200 border border-slate-600 backdrop-blur-sm active:scale-95">
+              카메라 전환
+            </button>
+          </div>
+
+          <!-- Center Aiming Frame -->
+          <div class="relative w-44 h-44 border-2 border-cyan-400/60 rounded-2xl scan-frame-pulse flex items-center justify-center">
+            <div class="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-cyan-400 rounded-tl-xl"></div>
+            <div class="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 border-cyan-400 rounded-tr-xl"></div>
+            <div class="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 border-cyan-400 rounded-bl-xl"></div>
+            <div class="absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-4 border-r-4 border-cyan-400 rounded-br-xl"></div>
+            <div class="laser-line"></div>
+          </div>
+
+          <div class="text-center">
+            <span id="scanner-guide-caption" class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-slate-950/85 text-white border border-slate-700">
+              파렛트 식별표 QR코드를 사각형 안에 맞추세요
+            </span>
+          </div>
+        </div>
+
+        <!-- Camera Fallback / Permission Guide (Shown if camera fails or desktop has no camera) -->
+        <div id="camera-fallback-box" class="hidden absolute inset-0 bg-slate-950/95 z-20 flex flex-col items-center justify-center p-4 text-center">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+            </svg>
+          </div>
+          <p class="text-sm font-bold text-white">카메라 연결 대기 또는 권한 필요</p>
+          <p id="camera-error-msg" class="text-xs text-slate-400 mt-1 max-w-xs">
+            휴대폰 카메라 권한을 허용하시거나 아래 [모의 스캔 테스트] 및 [카메라 재시작] 버튼을 이용하세요.
+          </p>
+          <div class="flex items-center gap-2 mt-3">
+            <button onclick="startScannerCamera()" class="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shadow active:scale-95 transition">
+              카메라 다시 켜기
+            </button>
+            <label class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-xs cursor-pointer active:scale-95 transition">
+              카메라 촬영/갤러리 스캔
+              <input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageFileScan(event)" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Instant Scan Result Flash Overlay (OK / NG / Completed) -->
+        <div id="scan-feedback-overlay" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center p-4 text-center backdrop-blur-md transition-all">
+          <!-- Populated dynamically on scan -->
+        </div>
+      </div>
+
+      <!-- Real-time Scan Result Banner (Persistent last scan feedback) -->
+      <div id="last-scan-banner" class="rounded-2xl p-3 border bg-slate-900 border-slate-800 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div id="last-scan-icon" class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 font-black text-xs shrink-0">
+            대기
+          </div>
+          <div class="min-w-0">
+            <div id="last-scan-title" class="text-sm font-extrabold text-slate-200 truncate">스캔 대기 중입니다</div>
+            <div id="last-scan-detail" class="text-xs text-slate-400 truncate">파렛트 QR을 스캔하면 즉시 이종 및 순번을 판정합니다.</div>
+          </div>
+        </div>
+        <span id="last-scan-time" class="text-[11px] font-mono text-slate-400 shrink-0">--:--:--</span>
+      </div>
+
+      <!-- 1 ~ 20 Pallet Sequence Progress Grid -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-extrabold text-slate-300 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            파렛트 투입 순번 현황 (1번 ~ 20번)
+          </span>
+          <span id="seq-progress-summary" class="text-xs font-extrabold text-emerald-400">0 / 20 완료</span>
+        </div>
+        <div id="pallet-grid-20" class="grid grid-cols-10 gap-1.5">
+          <!-- 1 to 20 badges generated by JS -->
+        </div>
+      </div>
+
+      <!-- Quick Simulation & Manual Test Bar (For verifying OK / NG without physical label) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-slate-300 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+            </svg>
+            모의 스캔 테스트 (카메라 없이 즉시 검증)
+          </span>
+          <span class="text-[10px] text-slate-400">터치 시 실제 스캔과 동일 작동</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="simulateScan('OK')" class="py-2 px-2.5 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition">
+            <span>✓ 정상 파렛트 스캔</span>
+            <span id="sim-ok-num" class="text-[11px] font-extrabold text-white">(1번)</span>
+          </button>
+          <button onclick="simulateScan('WRONG_ITEM')" class="py-2 px-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition">
+            <span>✕ 품목 이종 오류 테스트</span>
+          </button>
+          <button onclick="simulateScan('WRONG_SEQ')" class="py-2 px-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition">
+            <span>✕ 순번 불일치 테스트</span>
+          </button>
+          <button onclick="simulateScan('WRONG_LINE')" class="py-2 px-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition">
+            <span>✕ 타 라인 오투입 테스트</span>
+          </button>
+        </div>
+
+        <!-- Direct QR Input -->
+        <form onsubmit="handleManualQrSubmit(event)" class="mt-2 flex gap-1.5">
+          <input id="manual-qr-input" type="text" placeholder="직접 QR코드 문자열 입력 (예: 11|E10...|1)" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-400" />
+          <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-cyan-300 shrink-0 active:scale-95">
+            판정
+          </button>
+        </form>
+      </div>
+
+      <!-- Recent Scan History List for Current Line + Item -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-extrabold text-slate-300">현재 품목 스캔 이력</span>
+          <span id="history-count-label" class="text-[11px] text-slate-400">최근 기록 순</span>
+        </div>
+        <div id="item-history-list" class="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+          <!-- History items rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= FIXED BOTTOM NAVIGATION & ACTION BAR ================= -->
+  <footer class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-3 py-2.5 shadow-2xl">
+    <div class="max-w-md mx-auto grid grid-cols-2 gap-2.5">
+      <!-- Button 1: Home Screen (홈 화면) -->
+      <button id="btn-bottom-home" onclick="navigateToHome()" class="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition">
+        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+        </svg>
+        <span>홈 화면</span>
+      </button>
+
+      <!-- Button 2: Scan Complete / Reset to #1 (스캔완료) -->
+      <button id="btn-bottom-reset" onclick="handleScanCompleteButtonClick()" class="py-3 px-4 rounded-2xl bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 active:scale-95 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/25 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+        <span id="btn-reset-text">스캔완료 (초기화)</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- ================= CUSTOM CONFIRMATION MODAL (No native alert/confirm) ================= -->
+  <div id="confirm-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-3xl p-5 shadow-2xl">
+      <div class="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mx-auto mb-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+      </div>
+      <h3 id="confirm-modal-title" class="text-lg font-black text-white text-center">스캔완료 및 처음부터 준비</h3>
+      <p id="confirm-modal-desc" class="text-xs text-slate-300 text-center mt-2 leading-relaxed">
+        현재 품목의 스캔 이력을 완료 처리하고 1번 파렛트부터 다시 스캔할 수 있도록 초기화하시겠습니까?
+      </p>
+      <div class="grid grid-cols-2 gap-2.5 mt-5">
+        <button onclick="closeConfirmModal()" class="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-extrabold text-slate-300 active:scale-95">
+          취소
+        </button>
+        <button id="confirm-modal-ok-btn" class="py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-xs font-extrabold text-white shadow-lg shadow-rose-600/30 active:scale-95">
+          1번부터 다시 시작
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= QR CODE GENERATOR MODAL (For Testing Real Mobile Camera Scan) ================= -->
+  <div id="qr-generator-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-3xl p-4 shadow-2xl flex flex-col gap-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+        <div>
+          <h3 class="text-base font-black text-white">파렛트 식별표 QR 생성기</h3>
+          <p class="text-[11px] text-slate-400">다른 휴대폰이나 화면에 띄워 실제 카메라로 스캔해보세요</p>
+        </div>
+        <button onclick="closeQrGeneratorModal()" class="p-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Selectors for Line, Item, Sequence -->
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="text-[11px] font-bold text-slate-400 block mb-1">라인</label>
+          <select id="gen-line" onchange="updateGeneratedQr()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-white">
+            <option value="11">11라인</option>
+            <option value="12">12라인</option>
+            <option value="22">22라인</option>
+            <option value="23">23라인</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] font-bold text-slate-400 block mb-1">품목</label>
+          <select id="gen-item" onchange="updateGeneratedQr()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-white">
+            <option value="F/C">F/C</option>
+            <option value="F/B">F/B</option>
+            <option value="R/C">R/C</option>
+            <option value="R/B">R/B</option>
+            <option value="3/C">3/C</option>
+            <option value="3/B">3/B</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] font-bold text-slate-400 block mb-1">파렛트 순번</label>
+          <select id="gen-seq" onchange="updateGeneratedQr()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-white">
+            <!-- Populated 1..20 by JS -->
+          </select>
+        </div>
+      </div>
+
+      <!-- Generated QR Display Card -->
+      <div class="bg-white rounded-2xl p-4 flex flex-col items-center justify-center shadow-inner">
+        <div class="text-slate-900 font-black text-sm mb-2" id="gen-card-title">11라인 · F/C · 1번 파렛트</div>
+        <div id="qrcode-canvas-holder" class="p-2 bg-white rounded-xl"></div>
+        <code id="gen-qr-string" class="mt-2 text-[11px] font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg break-all text-center">
+          11|E10E10100|E20E20110|E30E30100|1
+        </code>
+      </div>
+
+      <!-- Quick Next/Prev Pallet Number in Generator -->
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="stepGeneratedSeq(-1)" class="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 active:scale-95">
+          ◀ 이전 순번 QR
+        </button>
+        <button onclick="stepGeneratedSeq(1)" class="py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white active:scale-95">
+          다음 순번 QR ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= APPLICATION JAVASCRIPT ================= -->
+  <script>
+    /**
+     * 1. 핵심 기준 데이터 정의 (라인 4개, 품목 6개, 품목별 QR 고유코드, 최대 순번 20)
+     */
+    const LINES = [
+      { id: "11", name: "11라인", desc: "제1공장 11호 조립라인", accent: "from-blue-600 to-cyan-500", badgeBg: "bg-blue-600" },
+      { id: "12", name: "12라인", desc: "제1공장 12호 조립라인", accent: "from-indigo-600 to-blue-500", badgeBg: "bg-indigo-600" },
+      { id: "22", name: "22라인", desc: "제2공장 22호 조립라인", accent: "from-emerald-600 to-teal-500", badgeBg: "bg-emerald-600" },
+      { id: "23", name: "23라인", desc: "제2공장 23호 조립라인", accent: "from-violet-600 to-purple-500", badgeBg: "bg-violet-600" }
+    ];
+
+    const ITEMS = [
+      { id: "F/C", name: "F/C", desc: "프론트 쿠션", code: "|E10E10100|E20E20110|E30E30100|", color: "amber" },
+      { id: "F/B", name: "F/B", desc: "프론트 백",   code: "|E10E10100|E20E20100|E30E30100|", color: "orange" },
+      { id: "R/C", name: "R/C", desc: "리어 쿠션",   code: "|E10E10100|E20E20110|E30E30110|", color: "emerald" },
+      { id: "R/B", name: "R/B", desc: "리어 백",     code: "|E10E10100|E20E20100|E30E30110|", color: "teal" },
+      { id: "3/C", name: "3/C", desc: "3열 쿠션",    code: "|E10E10100|E20E20110|E30E30130|", color: "purple" },
+      { id: "3/B", name: "3/B", desc: "3열 백",      code: "|E10E10100|E20E20100|E30E30130|", color: "pink" }
+    ];
+
+    const MAX_PALLET_SEQ = 20;
+    const STORAGE_KEY = "PALLET_SEQ_SCANNER_STATE_V1";
+
+    /**
+     * 2. 애플리케이션 상태 관리
+     * - records["11_F/C"] = { lastScannedSeq: 0, history: [ { seq, qr, time, status, message } ] }
+     */
+    let state = {
+      screen: "HOME",       // "HOME" | "ITEMS" | "SCANNER"
+      currentLine: null,    // "11" | "12" | "22" | "23"
+      currentItem: null,    // "F/C" | "F/B" | "R/C" | "R/B" | "3/C" | "3/B"
+      soundEnabled: true,
+      facingMode: "environment", // 후면 카메라 기본값
+      records: {}           // 4개 라인 x 6개 품목 = 24개 슬롯 이력 저장
+    };
+
+    // 카메라 및 연속 스캔 제어 변수
+    let html5QrCode = null;
+    let isCameraRunning = false;
+    let isScanCooldown = false;
+    let lastAcceptedQr = "";
+    let lastAcceptedTimestamp = 0;
+    let feedbackTimeoutId = null;
+    let audioCtx = null;
+    let qrGeneratorInstance = null;
+
+    /**
+     * 3. 초기화 및 LocalStorage 연동
+     */
+    function initApp() {
+      loadStateFromStorage();
+      populateQrGeneratorSeqOptions();
+      renderHomeScreen();
+      updateBottomButtonsContext();
+    }
+
+    function getRecordKey(lineId, itemId) {
+      return `${lineId}_${itemId}`;
+    }
+
+    function ensureAllRecordsExist() {
+      LINES.forEach(line => {
+        ITEMS.forEach(item => {
+          const key = getRecordKey(line.id, item.id);
+          if (!state.records[key]) {
+            state.records[key] = {
+              lastScannedSeq: 0, // 0이면 다음 스캔 대상이 1번 파렛트
+              history: []
+            };
+          }
+        });
+      });
+    }
+
+    function loadStateFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.records) {
+            state.records = parsed.records;
+          }
+          if (typeof parsed.soundEnabled === "boolean") {
+            state.soundEnabled = parsed.soundEnabled;
+          }
+        }
+      } catch (e) {
+        console.warn("스토리지 로드 오류:", e);
+      }
+      ensureAllRecordsExist();
+      updateSoundToggleUI();
+    }
+
+    function saveStateToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          records: state.records,
+          soundEnabled: state.soundEnabled
+        }));
+      } catch (e) {
+        console.warn("스토리지 저장 오류:", e);
+      }
+    }
+
+    /**
+     * 4. QR 코드 생성 및 파싱/검증 로직
+     * - 정상 포맷: [라인숫자] + [품목코드] + [순번]
+     *   예: 11|E10E10100|E20E20110|E30E30100|1
+     */
+    function getItemConfig(itemId) {
+      return ITEMS.find(i => i.id === itemId);
+    }
+
+    function getLineConfig(lineId) {
+      return LINES.find(l => l.id === lineId);
+    }
+
+    function buildExpectedQrString(lineId, itemId, seqNumber) {
+      const itemObj = getItemConfig(itemId);
+      if (!itemObj) return "";
+      return `${lineId}${itemObj.code}${seqNumber}`;
+    }
+
+    /**
+     * 스캔된 QR 문자열을 분석하여 어떤 라인, 어떤 품목, 몇 번 파렛트인지 역추적
+     */
+    function parseScannedQrString(rawQr) {
+      const cleaned = (rawQr || "").trim();
+      // 품목 코드 매칭 확인
+      let matchedItem = null;
+      for (const item of ITEMS) {
+        if (cleaned.includes(item.code)) {
+          matchedItem = item;
+          break;
+        }
+      }
+
+      if (!matchedItem) {
+        // 파이프(|) 구분자로 되어 있는지 추가 분석
+        const parts = cleaned.split("|");
+        if (parts.length === 5) {
+          const possibleLine = parts[0];
+          const possibleCode = `|${parts[1]}|${parts[2]}|${parts[3]}|`;
+          const possibleSeq = parseInt(parts[4], 10);
+          return {
+            validFormat: false,
+            raw: cleaned,
+            lineId: possibleLine,
+            itemId: null,
+            unknownCode: possibleCode,
+            seq: isNaN(possibleSeq) ? null : possibleSeq
+          };
+        }
+        return { validFormat: false, raw: cleaned };
+      }
+
+      const idx = cleaned.indexOf(matchedItem.code);
+      const prefixLine = cleaned.substring(0, idx);
+      const suffixSeqStr = cleaned.substring(idx + matchedItem.code.length);
+      const seqNum = /^\d+$/.test(suffixSeqStr) ? parseInt(suffixSeqStr, 10) : NaN;
+
+      return {
+        validFormat: !isNaN(seqNum) && prefixLine.length > 0,
+        raw: cleaned,
+        lineId: prefixLine,
+        itemId: matchedItem.id,
+        itemCode: matchedItem.code,
+        seq: isNaN(seqNum) ? null : seqNum
+      };
+    }
+
+    /**
+     * 5. 효과음 (Web Audio API) & 진동 피드백 (Android Haptic)
+     */
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSoundFeedback(type) {
+      if (!state.soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+
+        const now = ctx.currentTime;
+        if (type === "OK") {
+          // 맑은 2음 비프 (정상 투입)
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(1046.5, now);        // C6
+          osc.frequency.setValueAtTime(1567.98, now + 0.09); // G6
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.26);
+
+          if (navigator.vibrate) navigator.vibrate(80);
+        } else if (type === "COMPLETE") {
+          // 20번 파렛트 완료 팡파레 3음
+          [1046.5, 1318.5, 1567.98].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+            gain.gain.setValueAtTime(0.28, now + idx * 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.22);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.1);
+            osc.stop(now + idx * 0.1 + 0.22);
+          });
+          if (navigator.vibrate) navigator.vibrate([100, 60, 150]);
+        } else {
+          // 불량 / 이종 / 순번 오류 경고음 (강한 부저음 2회)
+          [0, 0.18].forEach(offset => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(240, now + offset);
+            osc.frequency.setValueAtTime(180, now + offset + 0.08);
+            gain.gain.setValueAtTime(0.32, now + offset);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.15);
+          });
+          if (navigator.vibrate) navigator.vibrate([200, 80, 250]);
+        }
+      } catch (e) {
+        console.warn("오디오 재생 예외:", e);
+      }
+    }
+
+    function toggleSound() {
+      state.soundEnabled = !state.soundEnabled;
+      updateSoundToggleUI();
+      saveStateToStorage();
+      if (state.soundEnabled) playSoundFeedback("OK");
+    }
+
+    function updateSoundToggleUI() {
+      const onIcon = document.getElementById("icon-sound-on");
+      const offIcon = document.getElementById("icon-sound-off");
+      if (state.soundEnabled) {
+        onIcon.classList.remove("hidden");
+        offIcon.classList.add("hidden");
+      } else {
+        onIcon.classList.add("hidden");
+        offIcon.classList.remove("hidden");
+      }
+    }
+
+    /**
+     * 6. 화면 전환 (네비게이션)
+     * - 홈 화면 (라인 선택) -> 품목 선택 화면 -> QR 스캐너 화면
+     */
+    async function navigateToHome() {
+      await stopScannerCamera();
+      state.screen = "HOME";
+      state.currentLine = null;
+      state.currentItem = null;
+
+      document.getElementById("screen-home").classList.remove("hidden");
+      document.getElementById("screen-items").classList.add("hidden");
+      document.getElementById("screen-scanner").classList.add("hidden");
+      document.getElementById("header-Subtitle").textContent = "홈 화면 · 작업할 라인을 선택하세요";
+
+      renderHomeScreen();
+      updateBottomButtonsContext();
+    }
+
+    async function navigateToItems(lineId) {
+      await stopScannerCamera();
+      state.screen = "ITEMS";
+      state.currentLine = lineId;
+      state.currentItem = null;
+
+      const lineObj = getLineConfig(lineId);
+      document.getElementById("selected-line-badge").textContent = lineObj.name;
+      document.getElementById("header-Subtitle").textContent = `${lineObj.name} · 투입할 품목을 선택하세요`;
+
+      document.getElementById("screen-home").classList.add("hidden");
+      document.getElementById("screen-items").classList.remove("hidden");
+      document.getElementById("screen-scanner").classList.add("hidden");
+
+      renderItemButtons(lineId);
+      updateBottomButtonsContext();
+    }
+
+    async function navigateToScanner(lineId, itemId) {
+      // 오디오 컨텍스트 활성화 (모바일 터치 이벤트 시점)
+      getAudioContext();
+
+      state.screen = "SCANNER";
+      state.currentLine = lineId;
+      state.currentItem = itemId;
+      lastAcceptedQr = "";
+      isScanCooldown = false;
+
+      document.getElementById("screen-home").classList.add("hidden");
+      document.getElementById("screen-items").classList.add("hidden");
+      document.getElementById("screen-scanner").classList.remove("hidden");
+
+      const lineObj = getLineConfig(lineId);
+      document.getElementById("header-Subtitle").textContent = `${lineObj.name} > ${itemId} 파렛트 스캔 중`;
+
+      renderScannerScreenUI();
+      updateBottomButtonsContext();
+
+      // 품목 선택 즉시 휴대폰 스캐너 자동 실행
+      await startScannerCamera();
+    }
+
+    function updateBottomButtonsContext() {
+      const resetTextEl = document.getElementById("btn-reset-text");
+      if (state.screen === "SCANNER" && state.currentLine && state.currentItem) {
+        resetTextEl.textContent = `스캔완료 (${state.currentItem} 초기화)`;
+      } else if (state.screen === "ITEMS" && state.currentLine) {
+        resetTextEl.textContent = `스캔완료 (${state.currentLine}라인 초기화)`;
+      } else {
+        resetTextEl.textContent = "스캔완료 (전체 초기화)";
+      }
+    }
+
+    /**
+     * 7. 각 화면 렌더링 함수
+     */
+    function renderHomeScreen() {
+      const container = document.getElementById("line-buttons-container");
+      let totalScannedAll = 0;
+
+      const cardsHtml = LINES.map(line => {
+        let lineScannedCount = 0;
+        let activeItemsSummary = [];
+
+        ITEMS.forEach(item => {
+          const rec = state.records[getRecordKey(line.id, item.id)];
+          const count = rec ? rec.lastScannedSeq : 0;
+          lineScannedCount += count;
+          totalScannedAll += count;
+          const nextText = count >= MAX_PALLET_SEQ ? "완료" : `${count + 1}번 대기`;
+          activeItemsSummary.push({
+            id: item.id,
+            count,
+            nextText
+          });
+        });
+
+        const totalPossible = ITEMS.length * MAX_PALLET_SEQ; // 120
+        const percent = Math.round((lineScannedCount / totalPossible) * 100);
+
+        return `
+          <button onclick="navigateToItems('${line.id}')"
+            class="w-full text-left rounded-3xl p-4 bg-slate-900 hover:bg-slate-800/95 border-2 border-slate-800 hover:border-cyan-500/60 shadow-lg transition-all active:scale-[0.98] flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br ${line.accent} flex flex-col items-center justify-center text-white shadow-md">
+                  <span class="text-xs font-bold opacity-85">LINE</span>
+                  <span class="text-xl font-black leading-none">${line.id}</span>
+                </div>
+                <div>
+                  <h3 class="text-xl font-black text-white tracking-tight">${line.name}</h3>
+                  <p class="text-xs text-slate-400 mt-0.5">${line.desc}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-950 border border-slate-800 text-cyan-400 font-extrabold text-xs">
+                <span>품목 선택</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
+            </div>
+
+            <!-- 6개 품목 미니 상태 배지 -->
+            <div class="grid grid-cols-6 gap-1.5 pt-2 border-t border-slate-800/90">
+              ${activeItemsSummary.map(s => `
+                <div class="rounded-xl px-1.5 py-1 text-center ${s.count > 0 ? 'bg-cyan-500/15 border border-cyan-500/40' : 'bg-slate-950/80 border border-slate-800'}">
+                  <div class="text-[11px] font-black ${s.count > 0 ? 'text-cyan-300' : 'text-slate-300'}">${s.id}</div>
+                  <div class="text-[10px] font-bold ${s.count >= MAX_PALLET_SEQ ? 'text-emerald-400' : s.count > 0 ? 'text-amber-300' : 'text-slate-500'}">
+                    ${s.count}/${MAX_PALLET_SEQ}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </button>
+        `;
+      }).join("");
+
+      container.innerHTML = cardsHtml;
+      document.getElementById("home-total-scanned").textContent = `${totalScannedAll}건`;
+    }
+
+    function renderItemButtons(lineId) {
+      const container = document.getElementById("item-buttons-container");
+
+      const colorMap = {
+        amber:   "from-amber-500/20 to-amber-600/5 border-amber-500/40 text-amber-300",
+        orange:  "from-orange-500/20 to-orange-600/5 border-orange-500/40 text-orange-300",
+        emerald: "from-emerald-500/20 to-emerald-600/5 border-emerald-500/40 text-emerald-300",
+        teal:    "from-teal-500/20 to-teal-600/5 border-teal-500/40 text-teal-300",
+        purple:  "from-purple-500/20 to-purple-600/5 border-purple-500/40 text-purple-300",
+        pink:    "from-pink-500/20 to-pink-600/5 border-pink-500/40 text-pink-300"
+      };
+
+      container.innerHTML = ITEMS.map(item => {
+        const rec = state.records[getRecordKey(lineId, item.id)];
+        const lastSeq = rec ? rec.lastScannedSeq : 0;
+        const isCompleted = lastSeq >= MAX_PALLET_SEQ;
+        const nextSeq = isCompleted ? MAX_PALLET_SEQ : lastSeq + 1;
+        const pct = Math.round((lastSeq / MAX_PALLET_SEQ) * 100);
+
+        return `
+          <button onclick="navigateToScanner('${lineId}', '${item.id}')"
+            class="rounded-3xl p-4 bg-gradient-to-br ${colorMap[item.color]} bg-slate-900 border-2 hover:border-cyan-400 shadow-lg flex flex-col justify-between text-left transition-all active:scale-95">
+            <div class="flex items-start justify-between w-full">
+              <div>
+                <span class="text-2xl font-black text-white tracking-tight block">${item.name}</span>
+                <span class="text-xs text-slate-300 font-medium">${item.desc}</span>
+              </div>
+              <span class="px-2 py-1 rounded-xl text-[11px] font-black ${isCompleted ? 'bg-emerald-500 text-slate-950' : lastSeq > 0 ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-300'}">
+                ${isCompleted ? '20번 완료' : `${nextSeq}번 대기`}
+              </span>
+            </div>
+
+            <div class="mt-4 w-full">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="text-slate-400 font-medium">이전 스캔: <strong class="text-white">${lastSeq === 0 ? '없음' : lastSeq + '번'}</strong></span>
+                <span class="font-bold text-slate-200">${lastSeq}/${MAX_PALLET_SEQ}</span>
+              </div>
+              <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div class="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300" style="width: ${pct}%"></div>
+              </div>
+              <div class="mt-2 flex items-center justify-between text-[11px] font-bold text-cyan-300">
+                <span>터치 시 스캐너 실행</span>
+                <span>▶</span>
+              </div>
+            </div>
+          </button>
+        `;
+      }).join("");
+    }
+
+    function renderScannerScreenUI() {
+      const lineId = state.currentLine;
+      const itemId = state.currentItem;
+      if (!lineId || !itemId) return;
+
+      const rec = state.records[getRecordKey(lineId, itemId)];
+      const lastSeq = rec.lastScannedSeq;
+      const isCompleted = lastSeq >= MAX_PALLET_SEQ;
+      const expectedSeq = isCompleted ? MAX_PALLET_SEQ : lastSeq + 1;
+
+      // 상단 배지 업데이트
+      document.getElementById("scan-line-badge").textContent = `${lineId}라인`;
+      document.getElementById("scan-item-badge").textContent = itemId;
+
+      const seqDisplay = document.getElementById("scan-expected-seq-display");
+      const expectedQrEl = document.getElementById("scan-expected-qr-code");
+      const simOkNumEl = document.getElementById("sim-ok-num");
+
+      if (isCompleted) {
+        seqDisplay.innerHTML = `<span class="text-emerald-400 text-lg">20/20 완료</span>`;
+        expectedQrEl.textContent = "1~20번 모든 파렛트 투입 완료 (하단 스캔완료 버튼으로 초기화)";
+        simOkNumEl.textContent = "(완료됨)";
+      } else {
+        seqDisplay.innerHTML = `${expectedSeq}<span class="text-xs font-bold text-slate-400 ml-0.5">/ 20번</span>`;
+        expectedQrEl.textContent = buildExpectedQrString(lineId, itemId, expectedSeq);
+        simOkNumEl.textContent = `(${expectedSeq}번)`;
+      }
+
+      // 1 ~ 20번 파렛트 진행 그리드 렌더링
+      document.getElementById("seq-progress-summary").textContent = `${lastSeq} / ${MAX_PALLET_SEQ} 완료`;
+      const gridEl = document.getElementById("pallet-grid-20");
+      let gridHtml = "";
+      for (let i = 1; i <= MAX_PALLET_SEQ; i++) {
+        let boxClass = "";
+        if (i <= lastSeq) {
+          // 완료된 순번
+          boxClass = "bg-emerald-500 text-slate-950 font-black border-emerald-400 shadow-sm shadow-emerald-500/30";
+        } else if (i === expectedSeq && !isCompleted) {
+          // 현재 스캔 대기 순번
+          boxClass = "bg-cyan-500/30 text-cyan-200 font-black border-2 border-cyan-400 animate-pulse";
+        } else {
+          // 향후 대기 순번
+          boxClass = "bg-slate-950 text-slate-500 font-bold border-slate-800";
+        }
+        gridHtml += `
+          <div class="h-7 rounded-lg border flex items-center justify-center text-xs ${boxClass}">
+            ${i}
+          </div>
+        `;
+      }
+      gridEl.innerHTML = gridHtml;
+
+      // 스캔 이력 목록 렌더링
+      renderItemHistoryList(rec.history);
+    }
+
+    function renderItemHistoryList(historyArr) {
+      const listEl = document.getElementById("item-history-list");
+      const countEl = document.getElementById("history-count-label");
+      countEl.textContent = `총 ${historyArr.length}건 기록`;
+
+      if (!historyArr || historyArr.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-xs text-slate-500 text-center py-4">
+            아직 스캔된 이력이 없습니다. 1번 파렛트부터 스캔해주세요.
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = historyArr.slice().reverse().map(entry => {
+        const isOk = entry.status === "OK";
+        return `
+          <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-xs ${isOk ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200' : 'bg-rose-950/30 border-rose-500/30 text-rose-200'}">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="px-1.5 py-0.5 rounded font-black text-[10px] ${isOk ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}">
+                ${isOk ? `${entry.seq}번 정상` : '오류(NG)'}
+              </span>
+              <span class="truncate font-medium">${entry.message}</span>
+            </div>
+            <span class="text-[10px] font-mono text-slate-400 shrink-0">${entry.time}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    /**
+     * 8. 카메라 스캐너 제어 (Android / iOS 호환 html5-qrcode)
+     */
+    async function startScannerCamera() {
+      const fallbackBox = document.getElementById("camera-fallback-box");
+      const statusPill = document.getElementById("camera-status-pill");
+      fallbackBox.classList.add("hidden");
+
+      await stopScannerCamera();
+
+      try {
+        if (typeof Html5Qrcode === "undefined") {
+          throw new Error("QR 스캐너 라이브러리를 불러오지 못했습니다.");
+        }
+
+        html5QrCode = new Html5Qrcode("qr-reader");
+        const config = {
+          fps: 12,
+          qrbox: { width: 210, height: 210 },
+          aspectRatio: 1.333333
+        };
+
+        await html5QrCode.start(
+          { facingMode: state.facingMode },
+          config,
+          (decodedText) => {
+            onQrCodeScanned(decodedText);
+          },
+          () => {
+            // 프레임별 미인식 콜백은 무시
+          }
+        );
+
+        isCameraRunning = true;
+        statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 스캐너 가동중 · 자동 연속 스캔`;
+      } catch (err) {
+        isCameraRunning = false;
+        console.warn("카메라 시작 안내:", err);
+        fallbackBox.classList.remove("hidden");
+        document.getElementById("camera-error-msg").textContent =
+          "카메라 권한이 거부되었거나 카메라가 없는 기기입니다. [카메라 촬영/갤러리 스캔] 또는 하단 [모의 스캔 테스트]를 사용할 수 있습니다.";
+      }
+    }
+
+    async function stopScannerCamera() {
+      if (html5QrCode && isCameraRunning) {
+        try {
+          await html5QrCode.stop();
+          await html5QrCode.clear();
+        } catch (e) {
+          console.warn("카메라 정지 중 예외:", e);
+        }
+      }
+      isCameraRunning = false;
+      html5QrCode = null;
+    }
+
+    async function switchCameraFacing() {
+      state.facingMode = state.facingMode === "environment" ? "user" : "environment";
+      await startScannerCamera();
+    }
+
+    // 카메라 스트림 대신 기본 카메라 앱 촬영으로 스캔할 때 (보조 수단)
+    async function handleImageFileScan(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const tempScanner = new Html5Qrcode("qr-reader");
+        const decodedText = await tempScanner.scanFile(file, true);
+        onQrCodeScanned(decodedText);
+      } catch (err) {
+        showInstantFeedbackOverlay("NG", "QR코드 인식 실패", "촬영된 사진에서 QR코드를 찾을 수 없습니다. 다시 선명하게 촬영해주세요.", "");
+        playSoundFeedback("NG");
+      } finally {
+        event.target.value = "";
+      }
+    }
+
+    /**
+     * 9. QR 코드 스캔 판정 및 연속 스캔 준비 (핵심 비즈니스 로직)
+     */
+    function onQrCodeScanned(rawQrText) {
+      if (state.screen !== "SCANNER" || !state.currentLine || !state.currentItem) return;
+
+      const cleanedQr = (rawQrText || "").trim();
+      if (!cleanedQr) return;
+
+      const nowMs = Date.now();
+
+      // 방금 정상 스캔 완료한 동일한 파렛트 QR이 카메라 화각에 계속 머물러 있는 경우 (연속 오탐 방지)
+      if (cleanedQr === lastAcceptedQr && (nowMs - lastAcceptedTimestamp) < 3200) {
+        const guideEl = document.getElementById("scanner-guide-caption");
+        guideEl.textContent = "방금 스캔 완료된 파렛트입니다. 다음 순번 파렛트를 비춰주세요.";
+        return;
+      }
+
+      // 쿨다운 중이면 대기
+      if (isScanCooldown) return;
+
+      const lineId = state.currentLine;
+      const itemId = state.currentItem;
+      const rec = state.records[getRecordKey(lineId, itemId)];
+      const lastSeq = rec.lastScannedSeq;
+
+      // 이미 20번까지 모두 완료된 상태인 경우
+      if (lastSeq >= MAX_PALLET_SEQ) {
+        playSoundFeedback("NG");
+        showInstantFeedbackOverlay(
+          "DONE",
+          "20번까지 투입 완료됨",
+          "이미 1번~20번 파렛트 스캔이 모두 끝났습니다. 처음부터 다시 스캔하려면 하단 [스캔완료] 버튼을 눌러주세요.",
+          cleanedQr
+        );
+        return;
+      }
+
+      const expectedSeq = lastSeq + 1;
+      const expectedQr = buildExpectedQrString(lineId, itemId, expectedSeq);
+      const timeStr = new Date().toTimeString().split(" ")[0];
+
+      // 1) 완벽히 일치하는 경우 (정상 투입!)
+      if (cleanedQr === expectedQr) {
+        rec.lastScannedSeq = expectedSeq;
+        lastAcceptedQr = cleanedQr;
+        lastAcceptedTimestamp = nowMs;
+
+        const isBatchFinished = expectedSeq >= MAX_PALLET_SEQ;
+        const okMsg = isBatchFinished
+          ? `${lineId}라인 ${itemId} 20번(마지막) 파렛트 정상 투입 완료!`
+          : `${lineId}라인 ${itemId} ${expectedSeq}번 파렛트 정상! (다음: ${expectedSeq + 1}번 준비)`;
+
+        rec.history.push({
+          seq: expectedSeq,
+          qr: cleanedQr,
+          time: timeStr,
+          status: "OK",
+          message: okMsg
+        });
+
+        saveStateToStorage();
+        renderScannerScreenUI();
+        updateLastScanBanner("OK", `${expectedSeq}번 파렛트 정상 투입 (OK)`, okMsg, timeStr);
+
+        if (isBatchFinished) {
+          playSoundFeedback("COMPLETE");
+          showInstantFeedbackOverlay(
+            "COMPLETE",
+            `${expectedSeq}번 스캔 정상 · 전체 완료!`,
+            `1번부터 20번까지 모든 파렛트 투입이 완료되었습니다. 하단 [스캔완료] 버튼을 누르면 다시 1번부터 스캔합니다.`,
+            cleanedQr,
+            1800
+          );
+        } else {
+          playSoundFeedback("OK");
+          showInstantFeedbackOverlay(
+            "OK",
+            `${expectedSeq}번 파렛트 정상 (OK)`,
+            `자동으로 다음 [${expectedSeq + 1}번 파렛트] 스캔을 준비합니다.`,
+            cleanedQr,
+            1100
+          );
+        }
+        return;
+      }
+
+      // 2) 불일치하는 경우 -> 상세 원인(라인 불일치 / 품목 이종 불일치 / 순번 오류 / 규격 외 QR) 정밀 분석
+      const parsed = parseScannedQrString(cleanedQr);
+      let errorTitle = "불량 · 이종/순번 오류 (NG)";
+      let errorDetail = "";
+
+      if (!parsed.validFormat) {
+        errorTitle = "식별표 QR 규격 불일치 (NG)";
+        errorDetail = `인식된 QR이 파렛트 식별표 규격이 아닙니다. (목표: ${lineId}라인 ${itemId} ${expectedSeq}번)`;
+      } else {
+        const reasons = [];
+        if (parsed.lineId !== lineId) {
+          reasons.push(`라인 불일치(현재 ${lineId}라인 ≠ 스캔 ${parsed.lineId}라인)`);
+        }
+        if (parsed.itemId !== itemId) {
+          reasons.push(`품목 이종 오류(현재 ${itemId} ≠ 스캔 ${parsed.itemId || '미상'})`);
+        }
+        if (parsed.seq !== expectedSeq) {
+          reasons.push(`순번 오류(대기 ${expectedSeq}번 ≠ 스캔 ${parsed.seq}번)`);
+        }
+        errorTitle = reasons.length > 0 ? reasons[0] : "이종/순번 불일치 (NG)";
+        errorDetail = reasons.join(" / ");
+      }
+
+      rec.history.push({
+        seq: expectedSeq,
+        qr: cleanedQr,
+        time: timeStr,
+        status: "NG",
+        message: `${errorDetail}`
+      });
+
+      saveStateToStorage();
+      renderScannerScreenUI();
+      playSoundFeedback("NG");
+      updateLastScanBanner("NG", errorTitle, errorDetail, timeStr);
+      showInstantFeedbackOverlay(
+        "NG",
+        errorTitle,
+        `${errorDetail}\n(현재 투입해야 할 순번: ${lineId}라인 ${itemId} ${expectedSeq}번)`,
+        cleanedQr,
+        1800
+      );
+    }
+
+    /**
+     * 스캔 직후 화면 중앙 피드백 오버레이 표시 후 자동으로 다음 스캔 준비
+     */
+    function showInstantFeedbackOverlay(type, title, detail, scannedQr, durationMs = 1300) {
+      const overlay = document.getElementById("scan-feedback-overlay");
+      isScanCooldown = true;
+
+      if (feedbackTimeoutId) clearTimeout(feedbackTimeoutId);
+
+      let bgClass = "";
+      let badgeHtml = "";
+      if (type === "OK") {
+        bgClass = "bg-emerald-950/90 border-4 border-emerald-400";
+        badgeHtml = `<div class="w-16 h-16 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center text-3xl font-black mb-2 shadow-lg">✓</div>`;
+      } else if (type === "COMPLETE") {
+        bgClass = "bg-cyan-950/95 border-4 border-cyan-400";
+        badgeHtml = `<div class="w-16 h-16 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center text-2xl font-black mb-2 shadow-lg">20/20</div>`;
+      } else {
+        bgClass = "bg-rose-950/95 border-4 border-rose-500";
+        badgeHtml = `<div class="w-16 h-16 rounded-full bg-rose-500 text-white flex items-center justify-center text-3xl font-black mb-2 shadow-lg">✕</div>`;
+      }
+
+      overlay.className = `absolute inset-0 z-30 flex flex-col items-center justify-center p-4 text-center backdrop-blur-md transition-all ${bgClass}`;
+      overlay.innerHTML = `
+        ${badgeHtml}
+        <h4 class="text-lg font-black text-white leading-snug">${title}</h4>
+        <p class="text-xs font-semibold text-slate-200 mt-1 whitespace-pre-line">${detail}</p>
+        ${scannedQr ? `<code class="mt-2 px-2 py-0.5 rounded bg-black/50 text-[10px] font-mono text-slate-300 max-w-full truncate">${scannedQr}</code>` : ''}
+        <div class="mt-3 text-[11px] font-bold text-cyan-300">자동으로 다음 스캔을 준비합니다...</div>
+      `;
+      overlay.classList.remove("hidden");
+
+      feedbackTimeoutId = setTimeout(() => {
+        overlay.classList.add("hidden");
+        isScanCooldown = false;
+        const guideEl = document.getElementById("scanner-guide-caption");
+        const rec = state.records[getRecordKey(state.currentLine, state.currentItem)];
+        if (rec && rec.lastScannedSeq < MAX_PALLET_SEQ) {
+          guideEl.textContent = `다음 [${rec.lastScannedSeq + 1}번 파렛트] QR코드를 사각형 안에 맞추세요`;
+        } else {
+          guideEl.textContent = "1~20번 모든 파렛트 스캔이 완료되었습니다.";
+        }
+      }, durationMs);
+    }
+
+    function updateLastScanBanner(status, title, detail, timeStr) {
+      const banner = document.getElementById("last-scan-banner");
+      const icon = document.getElementById("last-scan-icon");
+      const titleEl = document.getElementById("last-scan-title");
+      const detailEl = document.getElementById("last-scan-detail");
+      const timeEl = document.getElementById("last-scan-time");
+
+      if (status === "OK") {
+        banner.className = "rounded-2xl p-3 border bg-emerald-950/40 border-emerald-500/50 flex items-center justify-between gap-2";
+        icon.className = "w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-xs shrink-0";
+        icon.textContent = "정상";
+        titleEl.className = "text-sm font-extrabold text-emerald-300 truncate";
+      } else {
+        banner.className = "rounded-2xl p-3 border bg-rose-950/40 border-rose-500/60 flex items-center justify-between gap-2";
+        icon.className = "w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black text-xs shrink-0";
+        icon.textContent = "오류";
+        titleEl.className = "text-sm font-extrabold text-rose-300 truncate";
+      }
+
+      titleEl.textContent = title;
+      detailEl.textContent = detail;
+      timeEl.textContent = timeStr;
+    }
+
+    /**
+     * 10. 모의 스캔 테스트 및 수동 입력 핸들러
+     */
+    function simulateScan(mode) {
+      if (!state.currentLine || !state.currentItem) return;
+      getAudioContext();
+
+      const lineId = state.currentLine;
+      const itemId = state.currentItem;
+      const rec = state.records[getRecordKey(lineId, itemId)];
+      const nextSeq = Math.min(rec.lastScannedSeq + 1, MAX_PALLET_SEQ);
+
+      // 모의 스캔은 쿨다운 및 직전 중복 제한을 즉시 해제하여 빠른 연속 테스트 지원
+      isScanCooldown = false;
+      lastAcceptedQr = "";
+
+      if (mode === "OK") {
+        const qr = buildExpectedQrString(lineId, itemId, nextSeq);
+        onQrCodeScanned(qr);
+      } else if (mode === "WRONG_ITEM") {
+        const otherItem = ITEMS.find(i => i.id !== itemId) || ITEMS[1];
+        const qr = buildExpectedQrString(lineId, otherItem.id, nextSeq);
+        onQrCodeScanned(qr);
+      } else if (mode === "WRONG_SEQ") {
+        const wrongSeq = nextSeq < MAX_PALLET_SEQ ? nextSeq + 1 : 1;
+        const qr = buildExpectedQrString(lineId, itemId, wrongSeq);
+        onQrCodeScanned(qr);
+      } else if (mode === "WRONG_LINE") {
+        const otherLine = LINES.find(l => l.id !== lineId) || LINES[1];
+        const qr = buildExpectedQrString(otherLine.id, itemId, nextSeq);
+        onQrCodeScanned(qr);
+      }
+    }
+
+    function handleManualQrSubmit(event) {
+      event.preventDefault();
+      const inputEl = document.getElementById("manual-qr-input");
+      const val = inputEl.value.trim();
+      if (!val) return;
+      isScanCooldown = false;
+      lastAcceptedQr = "";
+      onQrCodeScanned(val);
+      inputEl.value = "";
+    }
+
+    /**
+     * 11. 하단 "스캔완료" 버튼 처리 (처음부터 다시 스캔 준비)
+     */
+    function handleScanCompleteButtonClick() {
+      const modal = document.getElementById("confirm-modal");
+      const titleEl = document.getElementById("confirm-modal-title");
+      const descEl = document.getElementById("confirm-modal-desc");
+      const okBtn = document.getElementById("confirm-modal-ok-btn");
+
+      if (state.screen === "SCANNER" && state.currentLine && state.currentItem) {
+        titleEl.textContent = `${state.currentLine}라인 [${state.currentItem}] 스캔완료`;
+        descEl.textContent = `${state.currentLine}라인 ${state.currentItem} 품목의 현재 스캔 진행을 완료하고, 다시 1번 파렛트부터 스캔할 수 있도록 준비하시겠습니까?`;
+        okBtn.onclick = () => {
+          resetItemProgress(state.currentLine, state.currentItem);
+          closeConfirmModal();
+        };
+      } else if (state.screen === "ITEMS" && state.currentLine) {
+        titleEl.textContent = `${state.currentLine}라인 전체 품목 스캔완료`;
+        descEl.textContent = `${state.currentLine}라인의 6개 품목 스캔 이력을 모두 초기화하고 1번 파렛트부터 다시 스캔할 수 있도록 준비하시겠습니까?`;
+        okBtn.onclick = () => {
+          ITEMS.forEach(item => resetItemProgress(state.currentLine, item.id, false));
+          saveStateToStorage();
+          renderItemButtons(state.currentLine);
+          closeConfirmModal();
+        };
+      } else {
+        titleEl.textContent = "전체 라인 스캔완료 (초기화)";
+        descEl.textContent = "모든 라인(11, 12, 22, 23라인)의 스캔 이력을 초기화하고 처음(1번 파렛트)부터 스캔할 수 있도록 준비하시겠습니까?";
+        okBtn.onclick = () => {
+          LINES.forEach(line => {
+            ITEMS.forEach(item => resetItemProgress(line.id, item.id, false));
+          });
+          saveStateToStorage();
+          renderHomeScreen();
+          closeConfirmModal();
+        };
+      }
+
+      modal.classList.remove("hidden");
+    }
+
+    function resetItemProgress(lineId, itemId, triggerRender = true) {
+      const key = getRecordKey(lineId, itemId);
+      state.records[key] = {
+        lastScannedSeq: 0,
+        history: []
+      };
+      lastAcceptedQr = "";
+      isScanCooldown = false;
+
+      if (triggerRender) {
+        saveStateToStorage();
+        if (state.screen === "SCANNER") {
+          renderScannerScreenUI();
+          const banner = document.getElementById("last-scan-banner");
+          banner.className = "rounded-2xl p-3 border bg-slate-900 border-slate-800 flex items-center justify-between gap-2";
+          document.getElementById("last-scan-icon").className = "w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-black text-xs shrink-0";
+          document.getElementById("last-scan-icon").textContent = "초기화";
+          document.getElementById("last-scan-title").className = "text-sm font-extrabold text-cyan-300 truncate";
+          document.getElementById("last-scan-title").textContent = "스캔완료 처리됨 · 1번부터 스캔 준비";
+          document.getElementById("last-scan-detail").textContent = `${lineId}라인 ${itemId} 1번 파렛트를 스캔해주세요.`;
+          playSoundFeedback("OK");
+        }
+      }
+    }
+
+    function closeConfirmModal() {
+      document.getElementById("confirm-modal").classList.add("hidden");
+    }
+
+    /**
+     * 12. 부가 UI 기능 (규격 안내 토글 및 식별표 QR 생성기 모달)
+     */
+    function toggleSpecTable() {
+      const wrapper = document.getElementById("spec-table-wrapper");
+      const label = document.getElementById("spec-toggle-label");
+      const isHidden = wrapper.classList.contains("hidden");
+      if (isHidden) {
+        wrapper.classList.remove("hidden");
+        label.textContent = "접기 ▲";
+      } else {
+        wrapper.classList.add("hidden");
+        label.textContent = "펼치기 ▼";
+      }
+    }
+
+    function populateQrGeneratorSeqOptions() {
+      const selectEl = document.getElementById("gen-seq");
+      let html = "";
+      for (let i = 1; i <= MAX_PALLET_SEQ; i++) {
+        html += `<option value="${i}">${i}번 파렛트</option>`;
+      }
+      selectEl.innerHTML = html;
+    }
+
+    function openQrGeneratorModal() {
+      // 현재 선택된 라인/품목/순번이 있으면 자동 반영
+      if (state.currentLine) {
+        document.getElementById("gen-line").value = state.currentLine;
+      }
+      if (state.currentItem) {
+        document.getElementById("gen-item").value = state.currentItem;
+      }
+      if (state.currentLine && state.currentItem) {
+        const rec = state.records[getRecordKey(state.currentLine, state.currentItem)];
+        const nextSeq = Math.min((rec ? rec.lastScannedSeq : 0) + 1, MAX_PALLET_SEQ);
+        document.getElementById("gen-seq").value = String(nextSeq);
+      }
+
+      document.getElementById("qr-generator-modal").classList.remove("hidden");
+      updateGeneratedQr();
+    }
+
+    function closeQrGeneratorModal() {
+      document.getElementById("qr-generator-modal").classList.add("hidden");
+    }
+
+    function stepGeneratedSeq(delta) {
+      const selectEl = document.getElementById("gen-seq");
+      let current = parseInt(selectEl.value, 10) || 1;
+      current += delta;
+      if (current < 1) current = MAX_PALLET_SEQ;
+      if (current > MAX_PALLET_SEQ) current = 1;
+      selectEl.value = String(current);
+      updateGeneratedQr();
+    }
+
+    function updateGeneratedQr() {
+      const lineId = document.getElementById("gen-line").value;
+      const itemId = document.getElementById("gen-item").value;
+      const seqNum = parseInt(document.getElementById("gen-seq").value, 10) || 1;
+
+      const qrText = buildExpectedQrString(lineId, itemId, seqNum);
+      document.getElementById("gen-card-title").textContent = `${lineId}라인 · ${itemId} · ${seqNum}번 파렛트`;
+      document.getElementById("gen-qr-string").textContent = qrText;
+
+      const holder = document.getElementById("qrcode-canvas-holder");
+      holder.innerHTML = "";
+      if (typeof QRCode !== "undefined") {
+        qrGeneratorInstance = new QRCode(holder, {
+          text: qrText,
+          width: 170,
+          height: 170,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+    }
+
+    // 페이지 로드 시 앱 시작
+    window.onload = function () {
+      initApp();
+    };
+  </script>
+</body>
+</html>
